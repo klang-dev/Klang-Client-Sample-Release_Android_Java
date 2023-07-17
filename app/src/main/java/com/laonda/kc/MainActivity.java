@@ -37,10 +37,6 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
 
-    private String TEST_APP_ID = "Conference3";
-    private String TEST_SECRET_KEY = "Conference3_secret";
-    private String TEST_GET_TOKEN_URL = "https://ticket-api.cod2f.dev/v1/client/access-token";
-    private String TEST_GET_SESSION_URL = "https://ticket-api.cod2f.dev/v1/client/session-node";
     private String TEST_ROOM_ID = "shawn";
 
     private Boolean isPublish = true;
@@ -157,7 +153,7 @@ public class MainActivity extends AppCompatActivity {
         config.countryCode = getApplicationContext().getResources().getConfiguration().locale.getCountry();
         config.appID = "Meet3";
         config.apiToken = "klang";
-        config.sessionNode = "ws://3.37.135.207:7780/ws";
+        config.sessionNode = "wss://ss.klang.network/ws";
         config.user = "edenAndroid";
         config.context = getApplicationContext();
         config.captureWidth = 640;
@@ -320,97 +316,5 @@ public class MainActivity extends AppCompatActivity {
             mainLayout.removeView(renders.get(key));
         }
         renders.clear();
-    }
-
-    private void getServiceInfo() {
-
-        AsyncTask.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    URL url =  new URL(TEST_GET_TOKEN_URL);
-                    HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
-                    conn.setRequestMethod("POST");
-                    conn.setRequestProperty("Content-Type", "application/json");
-                    conn.setRequestProperty("Accept", "application/json");
-                    conn.setDoOutput(true);
-                    conn.setDoInput(true);
-
-                    JSONObject json = new JSONObject();
-                    json.put("app_id", TEST_APP_ID);
-                    json.put("secret_key", TEST_SECRET_KEY);
-                    json.put("room_id", TEST_ROOM_ID);
-                    json.put("login_id", config.user);
-
-                    OutputStream outputStream;
-                    outputStream = conn.getOutputStream();
-                    outputStream.write(json.toString().getBytes());
-                    outputStream.flush();
-
-                    // 실제 서버로 Request 요청 하는 부분 (응답 코드를 받음, 200은 성공, 나머지 에러)
-                    int response = conn.getResponseCode();
-                    String responseMessage =  conn.getResponseMessage();
-
-                    InputStream responseBody = conn.getInputStream();
-                    InputStreamReader responseBodyReader = new InputStreamReader(responseBody, "UTF-8");
-                    JsonReader jsonReader = new JsonReader(responseBodyReader);
-                    jsonReader.beginObject(); // Start processing the JSON object
-                    while (jsonReader.hasNext()) { // Loop through all keys
-                        String key = jsonReader.nextName(); // Fetch the next key
-                        if (key.equals("access_token")) { // Check if desired key
-                            config.apiToken = jsonReader.nextString();
-                        } else if (key.equals("session_node_url")) { // Check if desired key
-                            config.sessionNode = jsonReader.nextString();
-                        }
-                        else {
-                            jsonReader.skipValue(); // Skip values of other keys
-                        }
-                    }
-                    conn.disconnect();
-
-                    kcSessionManager.initWithConfig(config, listener);
-                    kcSessionManager.joinRoomByToken(config.apiToken,TEST_ROOM_ID, config.user, KCType.KCMediaType.KC_AUDIO_VIDEO);
-                }catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-    }
-
-    private void getSessionNodeAddress() {
-        AsyncTask.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    URL url =  new URL(TEST_GET_SESSION_URL);
-                    HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
-                    conn.setRequestMethod("GET");
-                    conn.setRequestProperty("Content-Type", "application/json");
-                    conn.setRequestProperty("X-Access-Token", config.apiToken);
-
-                    conn.setDoInput(true);
-
-                    InputStream responseBody = conn.getInputStream();
-                    InputStreamReader responseBodyReader = new InputStreamReader(responseBody, "UTF-8");
-                    JsonReader jsonReader = new JsonReader(responseBodyReader);
-                    jsonReader.beginObject(); // Start processing the JSON object
-                    while (jsonReader.hasNext()) { // Loop through all keys
-                        String key = jsonReader.nextName(); // Fetch the next key
-                        if (key.equals("session_node_url")) { // Check if desired key
-                            config.sessionNode = jsonReader.nextString();
-//                            config.sessionNode ="ws://192.168.219.173:7780/ws";
-                            config.sessionNode =  "wss://u1.cod2f.dev/ws";
-                            kcSessionManager.initWithConfig(config, listener);
-                            break; // Break out of the loop
-                        } else {
-                            jsonReader.skipValue(); // Skip values of other keys
-                        }
-                    }
-                    conn.disconnect();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        });
     }
 }
