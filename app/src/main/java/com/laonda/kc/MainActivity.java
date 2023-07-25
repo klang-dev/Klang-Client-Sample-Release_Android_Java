@@ -21,11 +21,8 @@ import com.laonda.kckit.KCSessionManager;
 import com.laonda.kckit.KCType;
 import com.laonda.kckit.KCUser;
 
-import org.json.JSONObject;
-
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,14 +34,10 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
 
-    private String TEST_APP_ID = "Conference3";
-    private String TEST_SECRET_KEY = "Conference3_secret";
-    private String TEST_GET_TOKEN_URL = "https://ticket-api.cod2f.dev/v1/client/access-token";
-    private String TEST_GET_SESSION_URL = "https://ticket-api.cod2f.dev/v1/client/session-node";
     private String TEST_ROOM_ID = "shawn";
 
-    private Boolean isPublish = true;
-    private Boolean is1stPublish = false;
+    private Boolean isPublish = false;
+    private Boolean isJoined = false;
     private Boolean isSpeaker = false;
 
     private KCConfig config = KCConfig.getInstance();
@@ -108,12 +101,8 @@ public class MainActivity extends AppCompatActivity {
                         Log.d(TAG, "didRecvRoomInfo] room:"+ roomId + "user:" + user.userId + "userType:" + user.userType+ "stMic:" + user.stMic + "stCam:" + user.stCam + "stScreen:" + user.stScreen + "stData:" + user.stData);
 
                         if (user.userId.equals(config.user) && (user.userType == KCType.KCUserType.KC_USER_VIEWER)) {
-                            if (is1stPublish == false) {
-                                Log.d(TAG, "sendMedia============================");
-                                manager.publish(TEST_ROOM_ID, KCType.KCMediaType.KC_AUDIO_VIDEO);
-                                Log.d(TAG, "startPreview============================");
-                                manager.startPreview(TEST_ROOM_ID);
-                                is1stPublish = true;
+                            if (isJoined == false) {
+                                isJoined = true;
                             }
                         }
 
@@ -155,10 +144,10 @@ public class MainActivity extends AppCompatActivity {
         setPermission();
 
         config.countryCode = getApplicationContext().getResources().getConfiguration().locale.getCountry();
-        config.appID = "Meet3";
+        config.appID = "432e409445f9ab18a74d5c604c97addf";
         config.apiToken = "klang";
         config.sessionNode = "ws://3.37.135.207:7780/ws";
-        config.user = "edenAndroid";
+        config.user = "shawnAndroid";
         config.context = getApplicationContext();
         config.captureWidth = 640;
         config.captureHeight = 480;
@@ -182,13 +171,12 @@ public class MainActivity extends AppCompatActivity {
 
                 switch (view.getId()) {
                     case R.id.btnJoin:
-                        kcSessionManager.joinRoomByToken(config.apiToken,TEST_ROOM_ID, config.user, KCType.KCMediaType.KC_AUDIO_VIDEO);
-//                        getServiceInfo();
+                        getToken();
                         break ;
                     case R.id.btnLeave:
                         kcSessionManager.stopPreview(TEST_ROOM_ID);
                         kcSessionManager.leaveRoom(TEST_ROOM_ID);
-                        is1stPublish = false;
+                        isJoined = false;
                         clearRender();
                         break ;
                     case R.id.btnUnPub:
@@ -212,6 +200,8 @@ public class MainActivity extends AppCompatActivity {
                             alignRender();
 
                             kcSessionManager.startPreview(TEST_ROOM_ID);
+                            kcSessionManager.resumeRecording(TEST_ROOM_ID, KCType.KCMediaType.KC_AUDIO);
+                            kcSessionManager.resumeRecording(TEST_ROOM_ID, KCType.KCMediaType.KC_VIDEO);
                         }
                         break ;
                     case R.id.btnUnsubscribe:
@@ -299,6 +289,7 @@ public class MainActivity extends AppCompatActivity {
             renders.get(key).setLayoutParams(new android.widget.LinearLayout.LayoutParams(
                     android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
                     1200));
+
             mainLayout.removeView(renders.get(key));
             mainLayout.addView(renders.get(key));
 
@@ -322,13 +313,14 @@ public class MainActivity extends AppCompatActivity {
         renders.clear();
     }
 
-    private void getServiceInfo() {
+    private void getToken() {
 
         AsyncTask.execute(new Runnable() {
             @Override
             public void run() {
                 try {
-                    URL url =  new URL(TEST_GET_TOKEN_URL);
+                    String urlstr = "https://jwt.klang.network:8008/rtc-token?room_id="+TEST_ROOM_ID+"&user_id="+config.user;
+                    URL url =  new URL(urlstr);
                     HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
                     conn.setRequestMethod("POST");
                     conn.setRequestProperty("Content-Type", "application/json");
@@ -336,16 +328,16 @@ public class MainActivity extends AppCompatActivity {
                     conn.setDoOutput(true);
                     conn.setDoInput(true);
 
-                    JSONObject json = new JSONObject();
-                    json.put("app_id", TEST_APP_ID);
-                    json.put("secret_key", TEST_SECRET_KEY);
-                    json.put("room_id", TEST_ROOM_ID);
-                    json.put("login_id", config.user);
-
-                    OutputStream outputStream;
-                    outputStream = conn.getOutputStream();
-                    outputStream.write(json.toString().getBytes());
-                    outputStream.flush();
+//                    JSONObject json = new JSONObject();
+//                    json.put("app_id", TEST_APP_ID);
+//                    json.put("secret_key", TEST_SECRET_KEY);
+//                    json.put("room_id", TEST_ROOM_ID);
+//                    json.put("login_id", config.user);
+//
+//                    OutputStream outputStream;
+//                    outputStream = conn.getOutputStream();
+//                    outputStream.write(json.toString().getBytes());
+//                    outputStream.flush();
 
                     // 실제 서버로 Request 요청 하는 부분 (응답 코드를 받음, 200은 성공, 나머지 에러)
                     int response = conn.getResponseCode();
@@ -357,12 +349,9 @@ public class MainActivity extends AppCompatActivity {
                     jsonReader.beginObject(); // Start processing the JSON object
                     while (jsonReader.hasNext()) { // Loop through all keys
                         String key = jsonReader.nextName(); // Fetch the next key
-                        if (key.equals("access_token")) { // Check if desired key
+                        if (key.equals("jwt")) { // Check if desired key
                             config.apiToken = jsonReader.nextString();
-                        } else if (key.equals("session_node_url")) { // Check if desired key
-                            config.sessionNode = jsonReader.nextString();
-                        }
-                        else {
+                        } else {
                             jsonReader.skipValue(); // Skip values of other keys
                         }
                     }
@@ -371,43 +360,6 @@ public class MainActivity extends AppCompatActivity {
                     kcSessionManager.initWithConfig(config, listener);
                     kcSessionManager.joinRoomByToken(config.apiToken,TEST_ROOM_ID, config.user, KCType.KCMediaType.KC_AUDIO_VIDEO);
                 }catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-    }
-
-    private void getSessionNodeAddress() {
-        AsyncTask.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    URL url =  new URL(TEST_GET_SESSION_URL);
-                    HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
-                    conn.setRequestMethod("GET");
-                    conn.setRequestProperty("Content-Type", "application/json");
-                    conn.setRequestProperty("X-Access-Token", config.apiToken);
-
-                    conn.setDoInput(true);
-
-                    InputStream responseBody = conn.getInputStream();
-                    InputStreamReader responseBodyReader = new InputStreamReader(responseBody, "UTF-8");
-                    JsonReader jsonReader = new JsonReader(responseBodyReader);
-                    jsonReader.beginObject(); // Start processing the JSON object
-                    while (jsonReader.hasNext()) { // Loop through all keys
-                        String key = jsonReader.nextName(); // Fetch the next key
-                        if (key.equals("session_node_url")) { // Check if desired key
-                            config.sessionNode = jsonReader.nextString();
-//                            config.sessionNode ="ws://192.168.219.173:7780/ws";
-                            config.sessionNode =  "wss://u1.cod2f.dev/ws";
-                            kcSessionManager.initWithConfig(config, listener);
-                            break; // Break out of the loop
-                        } else {
-                            jsonReader.skipValue(); // Skip values of other keys
-                        }
-                    }
-                    conn.disconnect();
-                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
